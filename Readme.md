@@ -1,4 +1,4 @@
-# SIMS Phone Call Demo
+# Phone Call Demo
 
 Contains the following REST operations:
 
@@ -17,7 +17,7 @@ intent prompt:
 The response is a plain text (not JSON) call ID which can be used to retrieve
 the transcript when the model finishes.
 
-- `/transcript` (GET): Retrieves the transcript of a previously started call.
+## `/transcript` (GET): Retrieves the transcript of a previously started call.
 
 Will return HTTP status code 202 if the conversation is not finished yet. The
 intent is to invoke this method in a loop until it returns the status code 200.
