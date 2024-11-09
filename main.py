@@ -1,4 +1,3 @@
-import os
 import uuid
 from typing import Optional
 
@@ -9,10 +8,8 @@ from twilio.rest import Client  # type: ignore
 
 from entity import Call, Session
 from media_stream_handler import MediaStreamConnection
-from settings import API_KEY, OPENAI_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
-
-PORT = int(os.getenv('PORT', 5050))
-VOICE = 'alloy'
+from settings import (API_KEY, HTTPS_CERTIFICATE_KEY_PATH, HTTPS_CERTIFICATE_PATH,
+                      OPENAI_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 app = FastAPI()
 
@@ -75,11 +72,12 @@ async def media_stream(websocket: WebSocket, call_id: str):
         }
     ) as openai_ws:
         connection = MediaStreamConnection(
-            websocket, openai_ws, VOICE, session.intent_prompt)
+            websocket, openai_ws, "alloy", session.intent_prompt)
         await connection.handle()
-    
+
     session.transcript = connection.transcript
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=PORT)
+    uvicorn.run(app, host="0.0.0.0", port=443,
+                ssl_keyfile=HTTPS_CERTIFICATE_KEY_PATH, ssl_certfile=HTTPS_CERTIFICATE_PATH)
