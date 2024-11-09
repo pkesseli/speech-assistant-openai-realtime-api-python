@@ -1,8 +1,10 @@
 # Phone Call Demo
 
+## REST API
+
 Contains the following REST operations:
 
-## `/call` (POST)
+### `/call` (POST)
 
 Starts a new call to the given phone from the OAI model, based on the given
 intent prompt:
@@ -17,7 +19,7 @@ intent prompt:
 The response is a plain text (not JSON) call ID which can be used to retrieve
 the transcript when the model finishes.
 
-## `/transcript` (GET): Retrieves the transcript of a previously started call.
+### `/transcript` (GET): Retrieves the transcript of a previously started call.
 
 Will return HTTP status code 202 if the conversation is not finished yet. The
 intent is to invoke this method in a loop until it returns the status code 200.
@@ -37,7 +39,7 @@ messages:
 ]
 ```
 
-## `tool.py`
+### `tool.py`
 
 `tool.py` provides an example of how to integrate this service as an agent tool.
 
@@ -47,7 +49,89 @@ python .\tool.py
 I appreciate your help. If I need any more information, I'll be sure to reach out. Have a great day!"}, {'sender': 'user', 'content': 'You too. Thank you. Bye.\n'}, {'sender': 'agent', 'content': "You're welcome, Pascal. Take care!"}]
 ```
 
-The instructions below are from the original Twilio example project.
+## Docker
+
+To build the Docker image which is deplyoed on Azure, use:
+
+```bash
+docker build . --tag pkesseli/genai-phone-assistant:latest
+```
+
+To run the container locally, use:
+
+```bash
+docker run --name genai-phone-assistant --env-file=.env --volume /path/to/letsencrypt:/etc/letsencrypt --publish 443:443 pkesseli/genai-phone-assistant:latest
+```
+
+Note that this requires you to have the `letsencrypt` certificate directory
+mounted. A local container will not be reachable from Twilio, so this is just
+to test that the container starts successfully.
+
+Delete the container and image:
+
+```bash
+docker rm --force genai-phone-assistant
+docker image prune --all --force
+```
+
+Push the image to Docker Hub:
+
+```bash
+docker login
+docker push pkesseli/genai-phone-assistant:latest
+```
+
+## Azure Container Instances
+
+Create a log instance for all resources:
+
+```bash
+az monitor log-analytics workspace create --name speech-assistant-openai-realtime-api-python --resource-group speech-assistant-openai-realtime-api-python
+```
+
+Create a storage account to hold the letsencrypt certificate data:
+
+```bash
+az storage account delete --resource-group speech-assistant-openai-realtime-api-python --name genaiphoneletsencrypt
+az storage account create --resource-group speech-assistant-openai-realtime-api-python --name genaiphoneletsencrypt --location switzerlandnorth --sku Standard_LRS
+az storage account keys list --resource-group speech-assistant-openai-realtime-api-python --account-name genaiphoneletsencrypt --query "[0].value" --output tsv
+az storage share create --name letsencrypt --account-name genaiphoneletsencrypt
+```
+
+Start the container with a dummy entry point and create the letsencrypt certificate:
+
+```bash
+az container create --resource-group speech-assistant-openai-realtime-api-python --log-analytics-workspace speech-assistant-openai-realtime-api-python --name speech-assistant-openai-realtime-api-python --image pkesseli/genai-phone-assistant:latest --dns-name-label genai-phone-assistant-demo --memory 1 --ports 80 --azure-file-volume-account-name genaiphoneletsencrypt --azure-file-volume-account-key _storage-account-key_ --azure-file-volume-share-name letsencrypt --azure-file-volume-mount-path /etc/letsencrypt/ --command-line "sleep 3600"
+
+# In container via Azure Portal
+certbot certonly --non-interactive --agree-tos --standalone -m pkesseli@meta.com --domains genai-phone-assistant-demo.switzerlandnorth.azurecontainer.io
+```
+
+Delete the dummy container and restart it with the necessary secrets:
+
+```bash
+az container delete --name speech-assistant-openai-realtime-api-python --resource-group speech-assistant-openai-realtime-api-python
+az container create --resource-group speech-assistant-openai-realtime-api-python --log-analytics-workspace speech-assistant-openai-realtime-api-python --name speech-assistant-openai-realtime-api-python --image pkesseli/genai-phone-assistant:latest --dns-name-label genai-phone-assistant-demo --memory 1 --ports 443 --azure-file-volume-account-name genaiphoneletsencrypt --azure-file-volume-account-key _storage-account-key_ --azure-file-volume-share-name letsencrypt --azure-file-volume-mount-path /etc/letsencrypt/ --secure-environment-variables OPENAI_API_KEY=_openai_key_ TWILIO_ACCOUNT_SID=_twilio_account_sid_ TWILIO_AUTH_TOKEN=_twilio_auth_token_ API_KEY=_api_key_ --environment-variables HTTPS_CERTIFICATE_PATH=/etc/letsencrypt/live/genai-phone-assistant-demo.switzerlandnorth.azurecontainer.io/fullchain.pem HTTPS_CERTIFICATE_KEY_PATH=/etc/letsencrypt/live/genai-phone-assistant-demo.switzerlandnorth.azurecontainer.io/privkey.pem
+```
+
+Delete the container and the log analytics workspace if no longer needed:
+
+```bash
+az container delete --name speech-assistant-openai-realtime-api-python --resource-group speech-assistant-openai-realtime-api-python
+az monitor log-analytics workspace delete --name speech-assistant-openai-realtime-api-python --resource-group speech-assistant-openai-realtime-api-python
+```
+
+Log analytics query to retrieve container events not available in the default
+log view:
+
+```KQL
+ContainerInstanceLog_CL | limit 50
+```
+
+The remaing instructions below are from the original Twilio example project.
+
+---
+---
 
 
 #  Speech Assistant with Twilio Voice and the OpenAI Realtime API (Python)

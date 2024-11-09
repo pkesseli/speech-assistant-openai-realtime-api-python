@@ -10,10 +10,16 @@ from websockets import WebSocketClientProtocol
 from entity import Message
 
 LOG_EVENT_TYPES: set[str] = {
-    'error', 'response.content.done', 'rate_limits.updated',
-    'response.done', 'input_audio_buffer.committed',
-    'input_audio_buffer.speech_stopped', 'input_audio_buffer.speech_started',
-    'session.created'
+    "conversation.item.input_audio_transcription.completed",
+    'error',
+    'input_audio_buffer.committed',
+    'input_audio_buffer.speech_stopped',
+    'input_audio_buffer.speech_started',
+    'rate_limits.updated',
+    "response.audio_transcript.done",
+    'response.content.done',
+    'response.done',
+    'session.created',
 }
 
 
